@@ -29,11 +29,11 @@ class ConflictNotice(BaseModel):
     resolutionStrategy: Optional[str] = None
 
 class ReviewRecommendation(BaseModel):
-    concept: str
+    concept: str = "General Algorithms"
     resourceTitle: Optional[str] = None
     resourceSlug: Optional[str] = None
     url: Optional[str] = None
-    reason: str
+    reason: str = "Recommended foundational concept review."
 
 class ToolCallRecord(BaseModel):
     toolName: str
@@ -50,6 +50,12 @@ class AIResponse(BaseModel):
     claims: List[ObservationClaim] = Field(default_factory=list)
     conflictNotice: Optional[ConflictNotice] = None
     isUnanswerable: bool = False
+    isAmbiguous: bool = False
+    generationMode: Literal["llm", "deterministic_fallback"] = "deterministic_fallback"
+    provider: Optional[str] = None
+    modelName: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
+    contradictions: List[str] = Field(default_factory=list)
     toolCallsExecuted: List[ToolCallRecord] = Field(default_factory=list)
 
 class AIChatRequest(BaseModel):

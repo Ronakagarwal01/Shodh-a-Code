@@ -63,10 +63,15 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/health")
 def health_check():
+    llm_health = llm_provider.health_check()
     return {
         "status": "healthy",
         "service": "ai-service",
-        "llmProvider": settings.LLM_PROVIDER,
+        "llm_integrated": True,
+        "llm_provider": settings.LLM_PROVIDER,
+        "llm_model": settings.LLM_MODEL,
+        "llm_status": llm_health,
+        "generation_mode": "llm" if llm_provider.is_llm_active() else "deterministic_fallback",
         "qdrantConnected": hybrid_retriever.vector_store.use_qdrant,
         "neo4jConnected": graph_rag.store.use_neo4j,
         "collectionsLoaded": len(hybrid_retriever.lexical_index.documents),

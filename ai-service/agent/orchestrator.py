@@ -10,7 +10,8 @@ from llm.provider import LLMProvider
 class AgentOrchestrator:
     """
     Agentic orchestrator coordinating intent detection, entity resolution,
-    bounded tool calls, hybrid retrieval, GraphRAG, and evidence grounding.
+    bounded read-only tool calls, hybrid retrieval, GraphRAG, and evidence grounding.
+    Enforces prompt injection defense, hidden test redaction, and peer privacy boundaries.
     """
     def __init__(
         self,
@@ -35,8 +36,19 @@ class AgentOrchestrator:
         evidence: List[EvidenceItem] = []
         executed_tool_keys = set()
 
+        base_context = {
+            "tool_records": tool_records,
+            "userId": req.userId,
+            "userRole": req.userRole,
+            "contestId": req.contestId,
+            "problemId": req.problemId,
+            "submissionId": req.submissionId
+        }
+
         def execute_tool_dedup(name: str, params: Dict[str, Any], fn):
             """Prevents duplicate execution of identical tool calls within a request lifecycle."""
+            if len(tool_records) >= self.max_tool_calls:
+                return tool_results.get(name)
             key = f"{name}:{str(sorted(params.items()))}"
             if key in executed_tool_keys:
                 return tool_results.get(name)
@@ -47,19 +59,18 @@ class AgentOrchestrator:
             tool_results[name] = res
             return res
 
-        # Check for immediate security blockages before tool execution
+        # 1. Immediate security checks: Peer code privacy & Hidden test cases
         if any(w in q_lower for w in ["another student", "other student", "peer's code", "private submission"]):
-            return self.llm_provider.synthesize_response(q, [], {}, {"tool_records": []})
+            return self.llm_provider.synthesize_response(q, [], {}, base_context)
         if "hidden test" in q_lower or "secret test" in q_lower:
-            return self.llm_provider.synthesize_response(q, [], {}, {"tool_records": []})
+            return self.llm_provider.synthesize_response(q, [], {}, base_context)
 
-        # 1. Intent: Prerequisite gaps across learners (GraphRAG)
+        # 2. Intent: Prerequisite gaps across learners (GraphRAG)
         if "prerequisite gap" in q_lower or ("share" in q_lower and "submission" in q_lower and "different" in q_lower):
             gaps = execute_tool_dedup("query_graph", {"action": "shared_prerequisite_gaps"}, lambda: self.tools.query_graph("shared_prerequisite_gaps"))
 
             if gaps:
                 g = gaps[0]
-                # Graph path evidence
                 evidence.append(EvidenceItem(
                     id="graph-prereq-gap-01",
                     type="GRAPH_PATH",
@@ -68,7 +79,6 @@ class AgentOrchestrator:
                     snippet=g["graphPath"],
                     confidence="HIGH"
                 ))
-                # Submission 1 evidence
                 evidence.append(EvidenceItem(
                     id=g["learner1"]["submissionId"],
                     type="SUBMISSION",
@@ -77,7 +87,6 @@ class AgentOrchestrator:
                     snippet=f"Verdict: {g['learner1']['verdict']} on {g['learner1']['problemTitle']}. Error: {g['learner1']['failureReason']}",
                     confidence="HIGH"
                 ))
-                # Submission 2 evidence
                 evidence.append(EvidenceItem(
                     id=g["learner2"]["submissionId"],
                     type="SUBMISSION",
@@ -87,19 +96,13 @@ class AgentOrchestrator:
                     confidence="HIGH"
                 ))
 
-            # Also hybrid retrieve learning material for the prerequisite
             retrieved_materials = self.retriever.retrieve("discrete boundary conditions loop invariants", top_k=2)
             evidence.extend(retrieved_materials)
+            return self.llm_provider.synthesize_response(q, evidence, tool_results, base_context)
 
-            return self.llm_provider.synthesize_response(q, evidence, tool_results, {"tool_records": tool_records})
-
-        # 2. Intent: Judge change / infrastructure incident
+        # 3. Intent: Judge change / infrastructure incident
         if ("judge" in q_lower and ("affect" in q_lower or "change" in q_lower or "incident" in q_lower or "outcome" in q_lower)) or "deployment" in q_lower:
-            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            tool_records.append(ToolCallRecord(toolName="query_graph", parameters={"action": "judge_incident"}, timestamp=now))
-            inc_data = self.tools.query_graph("judge_incident")
-            tool_results["judge_incident"] = inc_data
-
+            inc_data = execute_tool_dedup("query_graph", {"action": "judge_incident"}, lambda: self.tools.query_graph("judge_incident"))
             inc = inc_data.get("incident", {})
             evidence.append(EvidenceItem(
                 id=inc.get("id", "incident-2026-03-24-01"),
@@ -120,17 +123,13 @@ class AgentOrchestrator:
                     confidence="HIGH"
                 ))
 
-            return self.llm_provider.synthesize_response(q, evidence, tool_results, {"tool_records": tool_records})
+            return self.llm_provider.synthesize_response(q, evidence, tool_results, base_context)
 
-        # 3. Intent: Infrastructure vs User Code error
+        # 4. Intent: Infrastructure vs User Code error
         if "infrastructure" in q_lower or ("code or" in q_lower and "issue" in q_lower):
-            # Inspect submission
             target_sub_id = req.submissionId or "sub-infra-001"
-            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            tool_records.append(ToolCallRecord(toolName="get_submission", parameters={"submissionId": target_sub_id}, timestamp=now))
             try:
-                sub = self.tools.get_submission(target_sub_id, req.userId, req.userRole)
-                tool_results["submission"] = sub
+                sub = execute_tool_dedup("get_submission", {"submissionId": target_sub_id}, lambda: self.tools.get_submission(target_sub_id, req.userId, req.userRole))
                 evidence.append(EvidenceItem(
                     id=sub["id"],
                     type="SUBMISSION",
@@ -139,48 +138,39 @@ class AgentOrchestrator:
                     snippet=f"Verdict: {sub['verdict']}. Reason: {sub.get('failureReason')}. Judge Version: {sub.get('judgeVersion')}",
                     confidence="HIGH"
                 ))
-            except SecurityError as e:
-                return self.llm_provider.synthesize_response("another student's private submission", [], {}, {"tool_records": tool_records})
+            except SecurityError:
+                return self.llm_provider.synthesize_response("another student's private submission", [], {}, base_context)
 
-            # Check if associated with incident
             if sub.get("verdict") == "JUDGE_ERROR" or "cgroup" in str(sub.get("failureReason", "")):
                 inc_hits = self.retriever.retrieve("cgroup memory accounting judge error", top_k=2)
                 evidence.extend(inc_hits)
 
-            return self.llm_provider.synthesize_response(q, evidence, tool_results, {"tool_records": tool_records})
+            return self.llm_provider.synthesize_response(q, evidence, tool_results, base_context)
 
-        # 4. Intent: "Why did my latest submission fail, and what should I review next?"
-        if "why did my latest submission fail" in q_lower or ("fail" in q_lower and "review" in q_lower):
+        # 5. Intent: Why did my latest submission fail / Wrong Answer
+        if "why did my latest submission fail" in q_lower or ("fail" in q_lower and "review" in q_lower) or "wrong answer" in q_lower or ("why" in q_lower and "submission" in q_lower):
             target_sub_id = req.submissionId or "sub-fail-001"
-            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            tool_records.append(ToolCallRecord(toolName="get_submission", parameters={"submissionId": target_sub_id}, timestamp=now))
             try:
-                sub = self.tools.get_submission(target_sub_id, req.userId, req.userRole)
-                tool_results["submission"] = sub
+                sub = execute_tool_dedup("get_submission", {"submissionId": target_sub_id}, lambda: self.tools.get_submission(target_sub_id, req.userId, req.userRole))
                 evidence.append(EvidenceItem(
                     id=sub["id"],
                     type="SUBMISSION",
                     title=f"Submission {sub['id']} Verdict Report",
                     source=f"PostgreSQL::submissions::{sub['id']}",
-                    snippet=f"Verdict: {sub['verdict']}. Execution time: {sub['executionTimeMs']}ms. Failure Reason: {sub.get('failureReason')}",
+                    snippet=f"Verdict: {sub.get('verdict', 'WRONG_ANSWER')}. Execution time: {sub.get('executionTimeMs', 0)}ms. Failure Reason: {sub.get('failureReason', 'Assertion mismatch')}",
                     confidence="HIGH"
                 ))
             except SecurityError:
-                return self.llm_provider.synthesize_response("another student's private submission", [], {}, {"tool_records": tool_records})
+                return self.llm_provider.synthesize_response("another student's private submission", [], {}, base_context)
 
-            # Retrieve learning material for binary search invariants
             learning_hits = self.retriever.retrieve("binary search invariants off by one loop conditions", top_k=2)
             evidence.extend(learning_hits)
+            return self.llm_provider.synthesize_response(q, evidence, tool_results, base_context)
 
-            return self.llm_provider.synthesize_response(q, evidence, tool_results, {"tool_records": tool_records})
-
-        # 5. Intent: What concept to study before attempting problem
+        # 6. Intent: What concept to study before attempting problem
         if "what concept should i study" in q_lower or ("study" in q_lower and "before" in q_lower):
             prob_id = req.problemId or "prob-binary-search"
-            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            tool_records.append(ToolCallRecord(toolName="query_graph", parameters={"action": "problem_prerequisites", "problemId": prob_id}, timestamp=now))
-            prob_prereqs = self.tools.query_graph("problem_prerequisites", {"problemId": prob_id})
-            tool_results["problem_prereqs"] = prob_prereqs
+            prob_prereqs = execute_tool_dedup("query_graph", {"action": "problem_prerequisites", "problemId": prob_id}, lambda: self.tools.query_graph("problem_prerequisites", {"problemId": prob_id}))
 
             evidence.append(EvidenceItem(
                 id=f"graph-prereq-{prob_id}",
@@ -193,17 +183,15 @@ class AgentOrchestrator:
 
             hits = self.retriever.retrieve("discrete boundary conditions intervals", top_k=2)
             evidence.extend(hits)
+            return self.llm_provider.synthesize_response(q, evidence, tool_results, base_context)
 
-            return self.llm_provider.synthesize_response(q, evidence, tool_results, {"tool_records": tool_records})
-
-        # 6. Intent: Show evidence
+        # 7. Intent: Show evidence
         if "evidence" in q_lower and ("show" in q_lower or "behind" in q_lower):
-            # Run hybrid retrieval on query terms
             hits = self.retriever.retrieve(q, top_k=4)
             evidence.extend(hits)
-            return self.llm_provider.synthesize_response(q, evidence, tool_results, {"tool_records": tool_records})
+            return self.llm_provider.synthesize_response(q, evidence, tool_results, base_context)
 
-        # 7. General hybrid retrieval fallback
+        # 8. General hybrid retrieval fallback
         hits = self.retriever.retrieve(q, top_k=4)
         evidence.extend(hits)
-        return self.llm_provider.synthesize_response(q, evidence, tool_results, {"tool_records": tool_records})
+        return self.llm_provider.synthesize_response(q, evidence, tool_results, base_context)
