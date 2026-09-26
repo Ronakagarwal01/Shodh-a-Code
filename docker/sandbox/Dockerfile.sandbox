@@ -1,0 +1,21 @@
+# ==============================================================================
+# Shodh-a-Code Assignment-Grade Isolated Execution Sandbox
+# ==============================================================================
+FROM python:3.11-alpine
+
+# Security: Remove package managers and build tools to prevent escalation
+RUN rm -rf /sbin/apk /etc/apk /lib/apk
+
+# Create unprivileged sandbox user
+RUN addgroup -g 10001 sandboxgroup && \
+    adduser -D -u 10001 -G sandboxgroup sandboxuser
+
+# Create isolated ephemeral workspace
+WORKDIR /workspace
+RUN chown -R sandboxuser:sandboxgroup /workspace
+
+USER sandboxuser
+
+# Network disabled at runtime via --network none
+# Filesystem mounted read-only at runtime via -v <temp_dir>:/workspace:ro
+ENTRYPOINT ["python3"]

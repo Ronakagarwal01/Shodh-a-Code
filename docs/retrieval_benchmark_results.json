@@ -1,0 +1,51 @@
+{
+  "queries": [
+    {
+      "query": "cgroup v2 memory accounting failure judge v1.4.2",
+      "category": "Exact Version / Incident",
+      "bm25_top": "incident-2026-03-24-01",
+      "vector_top": "incident-2026-03-24-01",
+      "hybrid_top": "incident-2026-03-24-01",
+      "latency_ms": 0.45,
+      "matched_ground_truth": true
+    },
+    {
+      "query": "binary search loop invariant off by one",
+      "category": "Algorithmic Concept",
+      "bm25_top": "res-boundary-01",
+      "vector_top": "res-boundary-01",
+      "hybrid_top": "res-boundary-01",
+      "latency_ms": 0.18,
+      "matched_ground_truth": false
+    },
+    {
+      "query": "topological sort cycle detection course prerequisites",
+      "category": "Graph & Dependencies",
+      "bm25_top": "prob-course-schedule",
+      "vector_top": "prob-course-schedule",
+      "hybrid_top": "prob-course-schedule",
+      "latency_ms": 0.36,
+      "matched_ground_truth": false
+    },
+    {
+      "query": "hash map complement lookup two sum",
+      "category": "Data Structure Pattern",
+      "bm25_top": "prob-two-sum",
+      "vector_top": "prob-two-sum",
+      "hybrid_top": "prob-two-sum",
+      "latency_ms": 0.7,
+      "matched_ground_truth": false
+    },
+    {
+      "query": "dynamic programming memoization coin change fewest coins",
+      "category": "Optimization Concept",
+      "bm25_top": "prob-coin-change",
+      "vector_top": "prob-coin-change",
+      "hybrid_top": "prob-coin-change",
+      "latency_ms": 0.42,
+      "matched_ground_truth": false
+    }
+  ],
+  "multi_hop_gaps_count": 1,
+  "graph_latency_ms": 0.11
+}
