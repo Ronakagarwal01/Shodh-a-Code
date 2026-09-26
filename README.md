@@ -152,71 +152,124 @@ npm run dev
 
 ---
 
-## 7. Docker Setup
-Launch the entire 8-container architecture from a clean environment with a single command:
+## 7. Quick Start (Docker)
+The primary and recommended way to start the entire Shodh-a-Code platform is via Docker Compose:
+
 ```bash
-docker compose down -v
-docker compose build --no-cache
-docker compose up -d
+docker compose up --build
 ```
-All containers include health checks and startup dependency ordering.
+This builds and starts all 8 services in the correct dependency order with automated health checks.
+
+> **Optional Reset / Troubleshooting Commands:**
+> ```bash
+> # Stop all containers and wipe test volumes
+> docker compose down -v
+> 
+> # Rebuild clean images without cache
+> docker compose build --no-cache
+> ```
 
 ---
 
 ## 8. Environment Variables
-Copy `.env.example` to `.env`:
+Copy `.env.example` to `.env` in the root directory:
 ```ini
-# AI / LLM Configuration
-LLM_PROVIDER=gemini
-LLM_MODEL=gemini-1.5-flash
-LLM_API_KEY=
+# ===================================================
+# Shodh-a-Code Environment Configuration Example
+# ===================================================
 
-# Contest API
-PORT=4000
-DATABASE_URL=postgresql://shodha_admin:shodha_secure_pass_2026@localhost:5432/shodha_contest_db
-JWT_SECRET=shodha_contest_super_secret_jwt_key_2026_prod
+# Database (PostgreSQL)
+POSTGRES_USER=shodha_user
+POSTGRES_PASSWORD=shodha_secure_pass_2026
+POSTGRES_DB=shodha_code
+POSTGRES_PORT=5432
+DATABASE_URL=postgresql://shodha_user:shodha_secure_pass_2026@localhost:5432/shodha_code
+
+# Redis & Queue
 REDIS_HOST=localhost
 REDIS_PORT=6379
+REDIS_URL=redis://localhost:6379
 
-# AI Service
+# Contest Backend (NestJS)
+PORT=4000
+JWT_SECRET=super_secret_jwt_key_shodh_a_code_2026_at_least_32_chars
+JWT_EXPIRES_IN=7d
+CORS_ORIGIN=http://localhost:3000
+
+# Judge Worker
+JUDGE_REDIS_URL=redis://localhost:6379
+JUDGE_TIMEOUT_MS=3000
+JUDGE_MEMORY_LIMIT_MB=256
+JUDGE_CPU_QUOTA=50000
+DOCKER_SANDBOX_IMAGE=shodha-sandbox:latest
+USE_DOCKER_JUDGE=true
+
+# AI Service (FastAPI)
 AI_SERVICE_PORT=8000
-CONTEST_API_URL=http://localhost:4000
+AI_SERVICE_URL=http://localhost:8000
+LLM_PROVIDER=gemini # options: gemini, openai, anthropic, mock_grounded
+LLM_API_KEY=
+LLM_MODEL=gemini-3.1-flash-lite
+MAX_TOOL_CALLS=5
+MAX_RETRIEVAL_RESULTS=8
+
+# Vector Database (Qdrant)
 QDRANT_HOST=localhost
 QDRANT_PORT=6333
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=shodha_knowledge
+
+# Graph Database (Neo4j)
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=shodha_graph_pass_2026
+
+# Frontend (Next.js)
+NEXT_PUBLIC_CONTEST_API_URL=http://localhost:4000
+NEXT_PUBLIC_AI_API_URL=http://localhost:8000
 ```
 
 ---
 
-## 9. LLM Setup
+## 9. LLM Setup & Dual-Mode Operation
 Shodh-a-Code supports **Dual-Mode AI Operation**:
-1. **WITH API KEY (`LLM_API_KEY` set)**:
-   - Activates **Real LLM Generation** via Google Gemini (`gemini-1.5-flash` or configured model).
-   - Generates free-form natural language grounded strictly in inspectable evidence via structured JSON schema.
-   - Metadata returns: `generationMode = "llm"`, `provider = "gemini"`.
-2. **WITHOUT API KEY (`LLM_API_KEY` empty)**:
-   - Activates **Deterministic Grounded Fallback**.
-   - Derives responses deterministically from transactional contest facts, graph paths, and learning resources.
-   - Metadata returns: `generationMode = "deterministic_fallback"`.
-   - Never breaks, never halts contests, and never claims to be an LLM when running in fallback.
+
+### 1. With API Key (`LLM_API_KEY` configured)
+- Set:
+  ```bash
+  LLM_API_KEY=<your Gemini API key>
+  ```
+- **Behavior**: Activates **Real Gemini LLM Generation** via the Google Generative Language API (`gemini-3.1-flash-lite` or configured model).
+- Generates natural language responses grounded strictly in inspectable evidence via structured JSON schema with prompt injection guardrails.
+- Metadata returned: `generationMode = "llm"`, `provider = "gemini"`.
+
+### 2. Without API Key (`LLM_API_KEY` empty / offline)
+- If no `LLM_API_KEY` is supplied, or during external provider outages (503 / rate limits / timeouts), the system uses the **Deterministic Grounded Fallback Engine**.
+- **Important Disclosure**: The fallback engine is **NOT an LLM** and does not pretend to be one. It is a deterministic, rule-and-graph-based provenance synthesizer that constructs structured pedagogical advice from verified test results, knowledge base records, and Cypher graph paths.
+- Metadata returned: `generationMode = "deterministic_fallback"`, `provider = "deterministic_engine"`.
+- This ensures the contest and submission workflow never crashes or blocks contestants when external AI services are unavailable.
+
+> **⚠️ Secret Safety:** Never commit your actual `LLM_API_KEY` to source control. The root `.env` file is gitignored.
 
 ---
 
-## 10. API Key Instructions
+## 10. API Key Configuration Guide
 To activate real Gemini LLM responses:
 1. Obtain an API key from [Google AI Studio](https://aistudio.google.com/).
-2. Set the key in `ai-service/.env` or export it in your shell:
+2. Set the key in your root `.env` file:
    ```bash
-   export LLM_API_KEY="your-gemini-api-key"
+   LLM_API_KEY="your-gemini-api-key"
    ```
-3. Restart `ai-service`. Verify via `GET http://localhost:8000/health`:
+3. Start or restart the `ai-service`. Verify via `GET http://localhost:8000/health`:
    ```json
    {
+     "status": "healthy",
+     "service": "ai-service",
      "llm_integrated": true,
+     "llm_provider": "gemini",
+     "llm_model": "gemini-3.1-flash-lite",
      "generation_mode": "llm",
-     "llm_status": {"status": "HEALTHY"}
+     "llm_status": {"status": "HEALTHY", "provider": "gemini"}
    }
    ```
 
@@ -235,6 +288,9 @@ The platform is initialized with realistic competitive programming curriculum da
 ---
 
 ## 12. Sample Identities
+
+> **⚠️ Local / Demo Credentials Warning:**  
+> These credentials and database passwords are for **local/demo seeded data only** and **must not be reused in production**. All secrets must be overridden with strong, uniquely generated keys in production deployments.
 
 | Username | Password | Role | Organization | Purpose |
 | :--- | :--- | :--- | :--- | :--- |

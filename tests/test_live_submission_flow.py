@@ -4,8 +4,8 @@ import json
 import time
 import sys
 
-API_URL = "http://localhost:4000"
-AI_URL = "http://localhost:8000"
+API_URL = "http://127.0.0.1:4000"
+AI_URL = "http://127.0.0.1:8000"
 
 def make_req(method, endpoint, data=None, token=None, base_url=API_URL):
     url = f"{base_url}{endpoint}"
