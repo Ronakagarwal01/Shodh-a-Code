@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     # LLM Settings
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini") # gemini | openai | anthropic | mock_grounded
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-1.5-flash")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-3.1-flash-lite")
     MAX_TOOL_CALLS: int = 5
     MAX_RETRIEVAL_RESULTS: int = 8
     
