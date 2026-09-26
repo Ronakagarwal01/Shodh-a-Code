@@ -139,22 +139,37 @@ class GraphRAG:
                 "prerequisites": [p["properties"] for p in prereq_nodes]
             })
 
-        # Multi-hop correlation
-        for i in range(len(learner_chains)):
-            for j in range(i + 1, len(learner_chains)):
-                c1 = learner_chains[i]
-                c2 = learner_chains[j]
+        # Multi-hop correlation using inverted index: prerequisite -> chains
+        # Replaces O(L^2) pairwise comparisons and repetitive dictionary allocations
+        # with an O(L * P) inverted index scan.
+        prereq_to_chains: Dict[str, Tuple[Dict[str, Any], List[Dict[str, Any]]]] = {}
+        for chain in learner_chains:
+            for p in chain["prerequisites"]:
+                p_id = p["id"]
+                if p_id not in prereq_to_chains:
+                    prereq_to_chains[p_id] = (p, [])
+                prereq_to_chains[p_id][1].append(chain)
 
-                # Check different learners, different problems or verdicts
-                if c1["user"]["id"] == c2["user"]["id"]:
-                    continue
+        seen_pairs = set()
+        for p_id, (shared_concept, chains) in prereq_to_chains.items():
+            if len(chains) < 2:
+                continue
+            # Deduplicate by user so a learner with multiple failed submissions doesn't pair with themselves
+            by_user: Dict[str, Dict[str, Any]] = {}
+            for c in chains:
+                u_id = c["user"]["id"]
+                if u_id not in by_user:
+                    by_user[u_id] = c
 
-                p1_prereqs = {p["id"]: p for p in c1["prerequisites"]}
-                p2_prereqs = {p["id"]: p for p in c2["prerequisites"]}
+            unique_chains = list(by_user.values())
+            for i in range(len(unique_chains)):
+                for j in range(i + 1, len(unique_chains)):
+                    c1, c2 = unique_chains[i], unique_chains[j]
+                    pair_key = (min(c1["user"]["id"], c2["user"]["id"]), max(c1["user"]["id"], c2["user"]["id"]), p_id)
+                    if pair_key in seen_pairs:
+                        continue
+                    seen_pairs.add(pair_key)
 
-                shared = set(p1_prereqs.keys()).intersection(p2_prereqs.keys())
-                for s_id in shared:
-                    shared_concept = p1_prereqs[s_id]
                     results.append({
                         "sharedPrerequisite": shared_concept,
                         "learner1": {

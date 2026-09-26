@@ -125,18 +125,26 @@ export class SubmissionsService {
     return this.sanitizeSubmission(submission, requestingUserId, requestingRole);
   }
 
-  async findByUser(userId: string) {
+  async findByUser(userId: string, limit: number = 50, offset: number = 0) {
+    const take = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const skip = Math.max(Number(offset) || 0, 0);
     const subs = await this.submissionRepo.find({
       where: { userId },
       order: { createdAt: 'DESC' },
+      take,
+      skip,
     });
     return subs.map((s) => this.sanitizeSubmission(s, userId, UserRole.LEARNER));
   }
 
-  async findByContest(contestId: string, requestingUserId: string, requestingRole: UserRole) {
+  async findByContest(contestId: string, requestingUserId: string, requestingRole: UserRole, limit: number = 50, offset: number = 0) {
+    const take = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const skip = Math.max(Number(offset) || 0, 0);
     const subs = await this.submissionRepo.find({
       where: { contestId },
       order: { createdAt: 'DESC' },
+      take,
+      skip,
     });
     return subs.map((s) => this.sanitizeSubmission(s, requestingUserId, requestingRole));
   }

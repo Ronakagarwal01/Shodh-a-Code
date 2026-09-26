@@ -6,7 +6,7 @@
       "bm25_top": "incident-2026-03-24-01",
       "vector_top": "incident-2026-03-24-01",
       "hybrid_top": "incident-2026-03-24-01",
-      "latency_ms": 0.45,
+      "latency_ms": 0.94,
       "matched_ground_truth": true
     },
     {
@@ -15,7 +15,7 @@
       "bm25_top": "res-boundary-01",
       "vector_top": "res-boundary-01",
       "hybrid_top": "res-boundary-01",
-      "latency_ms": 0.18,
+      "latency_ms": 0.36,
       "matched_ground_truth": false
     },
     {
@@ -24,7 +24,7 @@
       "bm25_top": "prob-course-schedule",
       "vector_top": "prob-course-schedule",
       "hybrid_top": "prob-course-schedule",
-      "latency_ms": 0.36,
+      "latency_ms": 0.37,
       "matched_ground_truth": false
     },
     {
@@ -33,7 +33,7 @@
       "bm25_top": "prob-two-sum",
       "vector_top": "prob-two-sum",
       "hybrid_top": "prob-two-sum",
-      "latency_ms": 0.7,
+      "latency_ms": 0.25,
       "matched_ground_truth": false
     },
     {
@@ -42,7 +42,7 @@
       "bm25_top": "prob-coin-change",
       "vector_top": "prob-coin-change",
       "hybrid_top": "prob-coin-change",
-      "latency_ms": 0.42,
+      "latency_ms": 0.25,
       "matched_ground_truth": false
     }
   ],

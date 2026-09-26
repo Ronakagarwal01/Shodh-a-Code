@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 export enum ProblemDifficulty {
   EASY = 'EASY',
@@ -7,6 +7,8 @@ export enum ProblemDifficulty {
 }
 
 @Entity('problems')
+@Index(['contestId'])
+@Index(['conceptId'])
 export class ProblemEntity {
   @PrimaryColumn('varchar', { length: 64 })
   id: string;

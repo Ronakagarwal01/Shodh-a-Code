@@ -21,7 +21,10 @@ export class LeaderboardService {
     private readonly leaderboardRepo: Repository<LeaderboardEntryEntity>,
   ) {}
 
-  async getLeaderboard(contestId: string) {
+  async getLeaderboard(contestId: string, limit: number = 100, offset: number = 0) {
+    const take = Math.min(Math.max(Number(limit) || 100, 1), 500);
+    const skip = Math.max(Number(offset) || 0, 0);
+
     const entries = await this.leaderboardRepo.find({
       where: { contestId },
       order: {
@@ -29,10 +32,12 @@ export class LeaderboardService {
         solvedCount: 'DESC',
         totalPenaltyMinutes: 'ASC',
       },
+      take,
+      skip,
     });
 
     return entries.map((entry, index) => ({
-      rank: index + 1,
+      rank: skip + index + 1,
       userId: entry.userId,
       username: entry.username,
       displayName: entry.displayName,

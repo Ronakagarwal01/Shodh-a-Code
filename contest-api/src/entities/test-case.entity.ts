@@ -1,6 +1,7 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 @Entity('test_cases')
+@Index(['problemId', 'orderIndex'])
 export class TestCaseEntity {
   @PrimaryColumn('varchar', { length: 64 })
   id: string;

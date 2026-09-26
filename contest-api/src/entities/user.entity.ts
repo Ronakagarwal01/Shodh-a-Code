@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 export enum UserRole {
   LEARNER = 'learner',
@@ -7,6 +7,8 @@ export enum UserRole {
 }
 
 @Entity('users')
+@Index(['organization'])
+@Index(['role'])
 export class UserEntity {
   @PrimaryColumn('varchar', { length: 64 })
   id: string;

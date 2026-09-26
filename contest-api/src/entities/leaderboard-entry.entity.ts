@@ -1,6 +1,8 @@
-import { Entity, PrimaryColumn, Column, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, UpdateDateColumn, Index } from 'typeorm';
 
 @Entity('leaderboard_entries')
+@Index(['contestId', 'totalScore', 'solvedCount', 'totalPenaltyMinutes'])
+@Index(['userId'])
 export class LeaderboardEntryEntity {
   @PrimaryColumn('varchar', { length: 128 }) // composite key e.g. contestId_userId
   id: string;

@@ -1,6 +1,7 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 @Entity('contest_incidents')
+@Index(['contestId'])
 export class ContestIncidentEntity {
   @PrimaryColumn('varchar', { length: 64 })
   id: string;

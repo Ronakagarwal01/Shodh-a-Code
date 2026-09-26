@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 export enum SubmissionVerdict {
   QUEUED = 'QUEUED',
@@ -13,6 +13,12 @@ export enum SubmissionVerdict {
 }
 
 @Entity('submissions')
+@Index(['userId', 'createdAt'])
+@Index(['contestId', 'createdAt'])
+@Index(['problemId'])
+@Index(['judgeVersion'])
+@Index(['verdict'])
+@Index(['status'])
 export class SubmissionEntity {
   @PrimaryColumn('varchar', { length: 64 })
   id: string;

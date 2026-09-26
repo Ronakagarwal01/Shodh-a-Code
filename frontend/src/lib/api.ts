@@ -131,16 +131,16 @@ export const api = {
     return res.json();
   },
 
-  async getMySubmissions() {
-    const res = await fetch(`${CONTEST_API_URL}/users/me/submissions`, {
+  async getMySubmissions(limit: number = 50, offset: number = 0) {
+    const res = await fetch(`${CONTEST_API_URL}/users/me/submissions?limit=${limit}&offset=${offset}`, {
       headers: { ...getAuthHeader() },
     });
     return res.json();
   },
 
   // Leaderboard
-  async getLeaderboard(contestId: string) {
-    const res = await fetch(`${CONTEST_API_URL}/contests/${contestId}/leaderboard`);
+  async getLeaderboard(contestId: string, limit: number = 50, offset: number = 0) {
+    const res = await fetch(`${CONTEST_API_URL}/contests/${contestId}/leaderboard?limit=${limit}&offset=${offset}`);
     return res.json();
   },
 

@@ -33,6 +33,19 @@ class AgentOrchestrator:
         tool_records: List[ToolCallRecord] = []
         tool_results: Dict[str, Any] = {}
         evidence: List[EvidenceItem] = []
+        executed_tool_keys = set()
+
+        def execute_tool_dedup(name: str, params: Dict[str, Any], fn):
+            """Prevents duplicate execution of identical tool calls within a request lifecycle."""
+            key = f"{name}:{str(sorted(params.items()))}"
+            if key in executed_tool_keys:
+                return tool_results.get(name)
+            executed_tool_keys.add(key)
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            tool_records.append(ToolCallRecord(toolName=name, parameters=params, timestamp=now))
+            res = fn()
+            tool_results[name] = res
+            return res
 
         # Check for immediate security blockages before tool execution
         if any(w in q_lower for w in ["another student", "other student", "peer's code", "private submission"]):
@@ -42,10 +55,7 @@ class AgentOrchestrator:
 
         # 1. Intent: Prerequisite gaps across learners (GraphRAG)
         if "prerequisite gap" in q_lower or ("share" in q_lower and "submission" in q_lower and "different" in q_lower):
-            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            tool_records.append(ToolCallRecord(toolName="query_graph", parameters={"action": "shared_prerequisite_gaps"}, timestamp=now))
-            gaps = self.tools.query_graph("shared_prerequisite_gaps")
-            tool_results["graph_gaps"] = gaps
+            gaps = execute_tool_dedup("query_graph", {"action": "shared_prerequisite_gaps"}, lambda: self.tools.query_graph("shared_prerequisite_gaps"))
 
             if gaps:
                 g = gaps[0]

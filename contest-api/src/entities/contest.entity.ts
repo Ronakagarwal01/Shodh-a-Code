@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 export enum ContestStatus {
   UPCOMING = 'UPCOMING',
@@ -7,6 +7,8 @@ export enum ContestStatus {
 }
 
 @Entity('contests')
+@Index(['status'])
+@Index(['organization'])
 export class ContestEntity {
   @PrimaryColumn('varchar', { length: 64 })
   id: string;

@@ -13,9 +13,11 @@ class GraphStore:
         self.driver = None
         self.use_neo4j = False
 
-        # Embedded graph representation: Nodes by label & id, edges by relationship type
+        # Embedded graph representation: Nodes by id, edges list, plus adjacency indexes for O(deg(v)) lookups
         self.nodes: Dict[str, Dict[str, Any]] = {}
         self.edges: List[Dict[str, Any]] = []
+        self._outgoing: Dict[str, List[Dict[str, Any]]] = {}
+        self._incoming: Dict[str, List[Dict[str, Any]]] = {}
 
         self._init_neo4j()
 
@@ -29,7 +31,6 @@ class GraphStore:
             print(f"[GraphStore] Connected successfully to Neo4j at {self.uri}")
         except Exception:
             self.use_neo4j = False
-            # print("[GraphStore] Neo4j offline or unreachable; using embedded knowledge graph engine.")
 
     def add_node(self, node_id: str, label: str, properties: Dict[str, Any]):
         self.nodes[node_id] = {
@@ -39,32 +40,48 @@ class GraphStore:
         }
 
     def add_edge(self, source_id: str, rel_type: str, target_id: str, properties: Dict[str, Any] = None):
-        self.edges.append({
+        edge_data = {
             "source": source_id,
             "type": rel_type,
             "target": target_id,
             "properties": properties or {}
-        })
+        }
+        self.edges.append(edge_data)
+
+        # Update adjacency index in O(1)
+        if source_id not in self._outgoing:
+            self._outgoing[source_id] = []
+        self._outgoing[source_id].append(edge_data)
+
+        if target_id not in self._incoming:
+            self._incoming[target_id] = []
+        self._incoming[target_id].append(edge_data)
 
     def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
         return self.nodes.get(node_id)
 
     def find_outgoing(self, source_id: str, rel_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Retrieves outgoing edges in O(deg+(v)) rather than scanning all O(E) edges.
+        """
         results = []
-        for edge in self.edges:
-            if edge["source"] == source_id:
-                if rel_type is None or edge["type"] == rel_type:
-                    target_node = self.nodes.get(edge["target"])
-                    if target_node:
-                        results.append({"edge": edge, "target": target_node})
+        adjacent_edges = self._outgoing.get(source_id, [])
+        for edge in adjacent_edges:
+            if rel_type is None or edge["type"] == rel_type:
+                target_node = self.nodes.get(edge["target"])
+                if target_node:
+                    results.append({"edge": edge, "target": target_node})
         return results
 
     def find_incoming(self, target_id: str, rel_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Retrieves incoming edges in O(deg-(v)) rather than scanning all O(E) edges.
+        """
         results = []
-        for edge in self.edges:
-            if edge["target"] == target_id:
-                if rel_type is None or edge["type"] == rel_type:
-                    source_node = self.nodes.get(edge["source"])
-                    if source_node:
-                        results.append({"edge": edge, "source": source_node})
+        adjacent_edges = self._incoming.get(target_id, [])
+        for edge in adjacent_edges:
+            if rel_type is None or edge["type"] == rel_type:
+                source_node = self.nodes.get(edge["source"])
+                if source_node:
+                    results.append({"edge": edge, "source": source_node})
         return results

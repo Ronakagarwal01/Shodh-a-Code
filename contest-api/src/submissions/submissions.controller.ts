@@ -28,17 +28,26 @@ export class SubmissionsController {
   @Get('users/me/submissions')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user submission history' })
-  async getMySubmissions(@Request() req: any) {
-    return this.submissionsService.findByUser(req.user.id);
+  @ApiOperation({ summary: 'Get current user submission history with pagination' })
+  async getMySubmissions(
+    @Request() req: any,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.submissionsService.findByUser(req.user.id, limit, offset);
   }
 
   @Get('contests/:id/submissions')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get submissions for a contest' })
-  async getContestSubmissions(@Param('id') contestId: string, @Request() req: any) {
-    return this.submissionsService.findByContest(contestId, req.user.id, req.user.role);
+  @ApiOperation({ summary: 'Get submissions for a contest with pagination' })
+  async getContestSubmissions(
+    @Param('id') contestId: string,
+    @Request() req: any,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.submissionsService.findByContest(contestId, req.user.id, req.user.role, limit, offset);
   }
 
   @Get('judge/test-cases/:problemId')
